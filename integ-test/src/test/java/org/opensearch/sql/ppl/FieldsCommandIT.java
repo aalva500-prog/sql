@@ -14,10 +14,12 @@ import static org.opensearch.sql.util.MatcherUtils.verifyColumn;
 import static org.opensearch.sql.util.MatcherUtils.verifyDataRows;
 import static org.opensearch.sql.util.MatcherUtils.verifyErrorMessageContains;
 import static org.opensearch.sql.util.MatcherUtils.verifySchema;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import org.json.JSONArray;
 import org.json.JSONObject;
-import org.junit.Ignore;
 import org.junit.jupiter.api.Test;
 
 public class FieldsCommandIT extends PPLIntegTestCase {
@@ -45,14 +47,41 @@ public class FieldsCommandIT extends PPLIntegTestCase {
     verifyColumn(result, columnName("firstname"), columnName("lastname"));
   }
 
-  @Ignore(
-      "Cannot resolve wildcard yet. Enable once"
-          + " https://github.com/opensearch-project/sql/issues/787 is resolved.")
   @Test
   public void testFieldsWildCard() throws IOException {
     JSONObject result =
-        executeQuery(String.format("source=%s | fields ", TEST_INDEX_ACCOUNT) + "firstnam%");
-    verifyColumn(result, columnPattern("^firstnam.*"));
+        executeQuery(String.format("source=%s | fields ", TEST_INDEX_ACCOUNT) + "firstnam*");
+    verifyColumn(result, columnName("firstname"));
+  }
+
+  @Test
+  public void testFieldsWildCardPrefix() throws IOException {
+    JSONObject result =
+        executeQuery(String.format("source=%s | fields ", TEST_INDEX_ACCOUNT) + "*name");
+    // Verify that fields ending with "name" are in the result
+    String resultStr = result.toString();
+    assertTrue("Should contain firstname", resultStr.contains("firstname"));
+    assertTrue("Should contain lastname", resultStr.contains("lastname"));
+  }
+
+  @Test
+  public void testFieldsWildCardMiddle() throws IOException {
+    JSONObject result =
+        executeQuery(String.format("source=%s | fields ", TEST_INDEX_ACCOUNT) + "*a*");
+    // Verify that fields containing "a" are in the result
+    String resultStr = result.toString();
+    assertTrue("Should contain lastname", resultStr.contains("lastname"));
+  }
+
+  @Test
+  public void testFieldsWildCardExclude() throws IOException {
+    JSONObject result =
+        executeQuery(String.format("source=%s | fields - ", TEST_INDEX_ACCOUNT) + "*name");
+    // Verify that fields ending with "name" are not in the result
+    String resultStr = result.toString();
+    // Check that firstname and lastname are not in the result in a way that's more reliable
+    assertFalse("Should not contain firstname", resultStr.matches(".*\"name\"\s*:\s*\"firstname\".*"));
+    assertFalse("Should not contain lastname", resultStr.matches(".*\"name\"\s*:\s*\"lastname\".*"));
   }
 
   @Test

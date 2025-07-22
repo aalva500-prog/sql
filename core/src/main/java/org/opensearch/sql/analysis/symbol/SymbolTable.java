@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 import org.opensearch.sql.data.type.ExprType;
 
@@ -139,5 +140,14 @@ public class SymbolTable {
    */
   public boolean isEmpty(Namespace namespace) {
     return tableByNamespace.getOrDefault(namespace, emptyNavigableMap()).isEmpty();
+  }
+  
+  /**
+   * Get all field names in the FIELD_NAME namespace.
+   *
+   * @return a set of all field names
+   */
+  public Set<String> getAllFieldNames() {
+    return orderedTable.getOrDefault(Namespace.FIELD_NAME, new LinkedHashMap<>()).keySet();
   }
 }

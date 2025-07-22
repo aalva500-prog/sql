@@ -272,7 +272,7 @@ public class AstBuilder extends OpenSearchPPLParserBaseVisitor<UnresolvedPlan> {
   @Override
   public UnresolvedPlan visitFieldsCommand(FieldsCommandContext ctx) {
     return new Project(
-        ctx.fieldList().fieldExpression().stream()
+        ctx.wcFieldList().wcFieldExpression().stream()
             .map(this::internalVisitExpression)
             .collect(Collectors.toList()),
         ArgumentFactory.getArgumentList(ctx));

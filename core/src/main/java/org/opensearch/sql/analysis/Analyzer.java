@@ -31,6 +31,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -384,41 +385,71 @@ public class Analyzer extends AbstractNodeVisitor<LogicalPlan, AnalysisContext> 
   @Override
   public LogicalPlan visitProject(Project node, AnalysisContext context) {
     LogicalPlan child = node.getChild().get(0).accept(this, context);
+    TypeEnvironment curEnv = context.peek();
 
+    // Handle wildcards in field names for both include and exclude modes
     if (node.hasArgument()) {
       Argument argument = node.getArgExprList().get(0);
       Boolean exclude = (Boolean) argument.getValue().getValue();
       if (exclude) {
-        TypeEnvironment curEnv = context.peek();
-        List<ReferenceExpression> referenceExpressions =
-            node.getProjectList().stream()
-                .map(expr -> (ReferenceExpression) expressionAnalyzer.analyze(expr, context))
-                .collect(Collectors.toList());
+        // Handle wildcards in field names for exclude mode
+        List<ReferenceExpression> referenceExpressions = expandWildcards(node.getProjectList(), curEnv, context);
         referenceExpressions.forEach(ref -> curEnv.remove(ref));
         return new LogicalRemove(child, ImmutableSet.copyOf(referenceExpressions));
       }
     }
 
+    // For include mode, expand wildcards in the project list
+    List<UnresolvedExpression> expandedProjectList = new ArrayList<>();
+    for (UnresolvedExpression expr : node.getProjectList()) {
+      if (expr instanceof Field field) {
+        String fieldName = field.getField().toString();
+        if (fieldName.contains("*")) {
+          // Get all field names from the environment
+          Set<String> allFieldNames = curEnv.symbolTable().getAllFieldNames();
+          // Convert wildcard pattern to regex pattern
+          String regex = "^" + fieldName.replace("*", ".*") + "$";
+          // Find matching fields and add them to the list
+          List<Field> matchedFields = allFieldNames.stream()
+              .filter(f -> f.matches(regex))
+              .map(AstDSL::field)
+              .collect(Collectors.toList());
+          
+          if (matchedFields.isEmpty()) {
+            // If no matches found, add the original field to maintain backward compatibility
+            expandedProjectList.add(expr);
+          } else {
+            // Add all matched fields
+            expandedProjectList.addAll(matchedFields);
+          }
+        } else {
+          expandedProjectList.add(expr);
+        }
+      } else {
+        expandedProjectList.add(expr);
+      }
+    }
+
     // For each unresolved window function, analyze it by "insert" a window and sort operator
     // between project and its child.
-    for (UnresolvedExpression expr : node.getProjectList()) {
+    for (UnresolvedExpression expr : expandedProjectList) {
       WindowExpressionAnalyzer windowAnalyzer =
           new WindowExpressionAnalyzer(expressionAnalyzer, child);
       child = windowAnalyzer.analyze(expr, context);
     }
 
-    for (UnresolvedExpression expr : node.getProjectList()) {
+    for (UnresolvedExpression expr : expandedProjectList) {
       HighlightAnalyzer highlightAnalyzer = new HighlightAnalyzer(expressionAnalyzer, child);
       child = highlightAnalyzer.analyze(expr, context);
     }
 
     List<NamedExpression> namedExpressions =
         selectExpressionAnalyzer.analyze(
-            node.getProjectList(),
+            expandedProjectList,
             context,
             new ExpressionReferenceOptimizer(expressionAnalyzer.getRepository(), child));
 
-    for (UnresolvedExpression expr : node.getProjectList()) {
+    for (UnresolvedExpression expr : expandedProjectList) {
       NestedAnalyzer nestedAnalyzer =
           new NestedAnalyzer(namedExpressions, expressionAnalyzer, child);
       child = nestedAnalyzer.analyze(expr, context);
@@ -432,6 +463,55 @@ public class Analyzer extends AbstractNodeVisitor<LogicalPlan, AnalysisContext> 
             newEnv.define(new Symbol(Namespace.FIELD_NAME, expr.getNameOrAlias()), expr.type()));
     List<NamedExpression> namedParseExpressions = context.getNamedParseExpressions();
     return new LogicalProject(child, namedExpressions, namedParseExpressions);
+  }
+  
+  /**
+   * Helper method to expand wildcards in field expressions.
+   *
+   * @param expressions List of expressions that may contain wildcards
+   * @param curEnv Current type environment
+   * @param context Analysis context
+   * @return List of reference expressions with wildcards expanded
+   */
+  private List<ReferenceExpression> expandWildcards(
+      List<UnresolvedExpression> expressions, TypeEnvironment curEnv, AnalysisContext context) {
+    List<ReferenceExpression> referenceExpressions = new ArrayList<>();
+    for (UnresolvedExpression expr : expressions) {
+      if (expr instanceof Field field) {
+        String fieldName = field.getField().toString();
+        if (fieldName.contains("*")) {
+          // Get all field names from the environment
+          Set<String> allFieldNames = curEnv.symbolTable().getAllFieldNames();
+          // Convert wildcard pattern to regex pattern
+          String regex = "^" + fieldName.replace("*", ".*") + "$";
+          // Find matching fields and add them to the list
+          List<String> matchedFields = allFieldNames.stream()
+              .filter(f -> f.matches(regex))
+              .collect(Collectors.toList());
+          
+          if (matchedFields.isEmpty()) {
+            // If no matches found, add the original field to maintain backward compatibility
+            referenceExpressions.add(
+                (ReferenceExpression) expressionAnalyzer.analyze(expr, context));
+          } else {
+            // Add all matched fields
+            matchedFields.stream()
+                .map(
+                    f ->
+                        (ReferenceExpression)
+                            expressionAnalyzer.analyze(AstDSL.field(f), context))
+                .forEach(referenceExpressions::add);
+          }
+        } else {
+          referenceExpressions.add(
+              (ReferenceExpression) expressionAnalyzer.analyze(expr, context));
+        }
+      } else {
+        referenceExpressions.add(
+            (ReferenceExpression) expressionAnalyzer.analyze(expr, context));
+      }
+    }
+    return referenceExpressions;
   }
 
   /** Build {@link LogicalEval}. */

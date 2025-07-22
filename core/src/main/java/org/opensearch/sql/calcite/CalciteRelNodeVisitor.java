@@ -197,8 +197,12 @@ public class CalciteRelNodeVisitor extends AbstractNodeVisitor<RelNode, CalciteP
       tryToRemoveMetaFields(context, allFields instanceof AllFieldsExcludeMeta);
       return context.relBuilder.peek();
     } else {
+      // Handle wildcards in field names for both include and exclude modes
+      List<UnresolvedExpression> expandedProjectList = expandWildcards(node.getProjectList(), context);
+
+      // Use expanded project list
       projectList =
-          node.getProjectList().stream()
+          expandedProjectList.stream()
               .map(expr -> rexVisitor.analyze(expr, context))
               .collect(Collectors.toList());
     }
@@ -212,6 +216,48 @@ public class CalciteRelNodeVisitor extends AbstractNodeVisitor<RelNode, CalciteP
       context.relBuilder.project(projectList);
     }
     return context.relBuilder.peek();
+  }
+  
+  /**
+   * Helper method to expand wildcards in field expressions.
+   *
+   * @param expressions List of expressions that may contain wildcards
+   * @param context Calcite plan context
+   * @return List of expressions with wildcards expanded
+   */
+  private List<UnresolvedExpression> expandWildcards(
+      List<UnresolvedExpression> expressions, CalcitePlanContext context) {
+    List<UnresolvedExpression> expandedProjectList = new ArrayList<>();
+    List<String> availableFields = context.relBuilder.peek().getRowType().getFieldNames();
+
+    for (UnresolvedExpression expr : expressions) {
+      if (expr instanceof Field field) {
+        String fieldName = field.getField().toString();
+        if (fieldName.contains("*")) {
+          // Convert wildcard pattern to regex pattern
+          String regex = "^" + fieldName.replace("*", ".*") + "$";
+          // Find matching fields
+          List<Field> matchedFields =
+              availableFields.stream()
+                  .filter(f -> f.matches(regex))
+                  .map(f -> AstDSL.field(f))
+                  .collect(Collectors.toList());
+          
+          if (matchedFields.isEmpty()) {
+            // If no matches found, add the original field to maintain backward compatibility
+            expandedProjectList.add(expr);
+          } else {
+            // Add all matched fields
+            expandedProjectList.addAll(matchedFields);
+          }
+        } else {
+          expandedProjectList.add(expr);
+        }
+      } else {
+        expandedProjectList.add(expr);
+      }
+    }
+    return expandedProjectList;
   }
 
   /** See logic in {@link org.opensearch.sql.analysis.symbol.SymbolTable#lookupAllFields} */

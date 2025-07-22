@@ -135,7 +135,7 @@ whereCommand
    ;
 
 fieldsCommand
-   : FIELDS (PLUS | MINUS)? fieldList
+   : FIELDS (PLUS | MINUS)? wcFieldList
    ;
 
 renameCommand
