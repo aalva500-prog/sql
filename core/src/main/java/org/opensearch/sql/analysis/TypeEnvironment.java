@@ -119,7 +119,7 @@ public class TypeEnvironment implements Environment<Symbol, ExprType> {
   public void clearAllFields() {
     lookupAllFields(FIELD_NAME).keySet().forEach(v -> remove(new Symbol(Namespace.FIELD_NAME, v)));
   }
-  
+
   /**
    * Get the symbol table.
    *

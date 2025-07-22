@@ -5,20 +5,18 @@
 
 package org.opensearch.sql.ppl;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.opensearch.sql.legacy.TestsConstants.*;
 import static org.opensearch.sql.util.MatcherUtils.columnName;
-import static org.opensearch.sql.util.MatcherUtils.columnPattern;
 import static org.opensearch.sql.util.MatcherUtils.rows;
 import static org.opensearch.sql.util.MatcherUtils.schema;
 import static org.opensearch.sql.util.MatcherUtils.verifyColumn;
 import static org.opensearch.sql.util.MatcherUtils.verifyDataRows;
 import static org.opensearch.sql.util.MatcherUtils.verifyErrorMessageContains;
 import static org.opensearch.sql.util.MatcherUtils.verifySchema;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
 
@@ -80,8 +78,10 @@ public class FieldsCommandIT extends PPLIntegTestCase {
     // Verify that fields ending with "name" are not in the result
     String resultStr = result.toString();
     // Check that firstname and lastname are not in the result in a way that's more reliable
-    assertFalse("Should not contain firstname", resultStr.matches(".*\"name\"\s*:\s*\"firstname\".*"));
-    assertFalse("Should not contain lastname", resultStr.matches(".*\"name\"\s*:\s*\"lastname\".*"));
+    assertFalse(
+        "Should not contain firstname", resultStr.matches(".*\"name\"\s*:\s*\"firstname\".*"));
+    assertFalse(
+        "Should not contain lastname", resultStr.matches(".*\"name\"\s*:\s*\"lastname\".*"));
   }
 
   @Test

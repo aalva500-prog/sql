@@ -393,7 +393,8 @@ public class Analyzer extends AbstractNodeVisitor<LogicalPlan, AnalysisContext> 
       Boolean exclude = (Boolean) argument.getValue().getValue();
       if (exclude) {
         // Handle wildcards in field names for exclude mode
-        List<ReferenceExpression> referenceExpressions = expandWildcards(node.getProjectList(), curEnv, context);
+        List<ReferenceExpression> referenceExpressions =
+            expandWildcards(node.getProjectList(), curEnv, context);
         referenceExpressions.forEach(ref -> curEnv.remove(ref));
         return new LogicalRemove(child, ImmutableSet.copyOf(referenceExpressions));
       }
@@ -410,11 +411,12 @@ public class Analyzer extends AbstractNodeVisitor<LogicalPlan, AnalysisContext> 
           // Convert wildcard pattern to regex pattern
           String regex = "^" + fieldName.replace("*", ".*") + "$";
           // Find matching fields and add them to the list
-          List<Field> matchedFields = allFieldNames.stream()
-              .filter(f -> f.matches(regex))
-              .map(AstDSL::field)
-              .collect(Collectors.toList());
-          
+          List<Field> matchedFields =
+              allFieldNames.stream()
+                  .filter(f -> f.matches(regex))
+                  .map(AstDSL::field)
+                  .collect(Collectors.toList());
+
           if (matchedFields.isEmpty()) {
             // If no matches found, add the original field to maintain backward compatibility
             expandedProjectList.add(expr);
@@ -464,7 +466,7 @@ public class Analyzer extends AbstractNodeVisitor<LogicalPlan, AnalysisContext> 
     List<NamedExpression> namedParseExpressions = context.getNamedParseExpressions();
     return new LogicalProject(child, namedExpressions, namedParseExpressions);
   }
-  
+
   /**
    * Helper method to expand wildcards in field expressions.
    *
@@ -485,10 +487,9 @@ public class Analyzer extends AbstractNodeVisitor<LogicalPlan, AnalysisContext> 
           // Convert wildcard pattern to regex pattern
           String regex = "^" + fieldName.replace("*", ".*") + "$";
           // Find matching fields and add them to the list
-          List<String> matchedFields = allFieldNames.stream()
-              .filter(f -> f.matches(regex))
-              .collect(Collectors.toList());
-          
+          List<String> matchedFields =
+              allFieldNames.stream().filter(f -> f.matches(regex)).collect(Collectors.toList());
+
           if (matchedFields.isEmpty()) {
             // If no matches found, add the original field to maintain backward compatibility
             referenceExpressions.add(
@@ -497,18 +498,14 @@ public class Analyzer extends AbstractNodeVisitor<LogicalPlan, AnalysisContext> 
             // Add all matched fields
             matchedFields.stream()
                 .map(
-                    f ->
-                        (ReferenceExpression)
-                            expressionAnalyzer.analyze(AstDSL.field(f), context))
+                    f -> (ReferenceExpression) expressionAnalyzer.analyze(AstDSL.field(f), context))
                 .forEach(referenceExpressions::add);
           }
         } else {
-          referenceExpressions.add(
-              (ReferenceExpression) expressionAnalyzer.analyze(expr, context));
+          referenceExpressions.add((ReferenceExpression) expressionAnalyzer.analyze(expr, context));
         }
       } else {
-        referenceExpressions.add(
-            (ReferenceExpression) expressionAnalyzer.analyze(expr, context));
+        referenceExpressions.add((ReferenceExpression) expressionAnalyzer.analyze(expr, context));
       }
     }
     return referenceExpressions;

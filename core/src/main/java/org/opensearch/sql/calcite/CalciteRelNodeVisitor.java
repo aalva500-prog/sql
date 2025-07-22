@@ -198,7 +198,8 @@ public class CalciteRelNodeVisitor extends AbstractNodeVisitor<RelNode, CalciteP
       return context.relBuilder.peek();
     } else {
       // Handle wildcards in field names for both include and exclude modes
-      List<UnresolvedExpression> expandedProjectList = expandWildcards(node.getProjectList(), context);
+      List<UnresolvedExpression> expandedProjectList =
+          expandWildcards(node.getProjectList(), context);
 
       // Use expanded project list
       projectList =
@@ -217,7 +218,7 @@ public class CalciteRelNodeVisitor extends AbstractNodeVisitor<RelNode, CalciteP
     }
     return context.relBuilder.peek();
   }
-  
+
   /**
    * Helper method to expand wildcards in field expressions.
    *
@@ -242,7 +243,7 @@ public class CalciteRelNodeVisitor extends AbstractNodeVisitor<RelNode, CalciteP
                   .filter(f -> f.matches(regex))
                   .map(f -> AstDSL.field(f))
                   .collect(Collectors.toList());
-          
+
           if (matchedFields.isEmpty()) {
             // If no matches found, add the original field to maintain backward compatibility
             expandedProjectList.add(expr);

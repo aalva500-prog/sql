@@ -141,7 +141,7 @@ public class SymbolTable {
   public boolean isEmpty(Namespace namespace) {
     return tableByNamespace.getOrDefault(namespace, emptyNavigableMap()).isEmpty();
   }
-  
+
   /**
    * Get all field names in the FIELD_NAME namespace.
    *
